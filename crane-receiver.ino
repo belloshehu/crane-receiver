@@ -12,11 +12,18 @@ Date: 30/07/2025
 #include <NewPing.h>
 
 
+# define ACTIVE_LOW_ON LOW // Active low value for ON state
+# define ACTIVE_LOW_OFF HIGH // Active low value for OFF state
+
+# define ACTIVE_HIGH_ON HIGH // Active HIGH value for ON state
+# define ACTIVE_HIGH_OFF LOW // Active HIGH value for OFF state
+
+
 // --- DRIVER MODULE 1 (WHEEL) PINS---
-#define STEERING_PIN1 14
-#define STEERING_PIN2 15
-#define WHEELS_PIN1 16
-#define WHEELS_PIN2 17
+#define STEERING_PIN1 16
+#define STEERING_PIN2 17
+#define WHEELS_PIN1 14
+#define WHEELS_PIN2 15
 
 // --- LED PINS
 #define LED_SIGNAL 18 
@@ -78,14 +85,26 @@ int adc_value = 0;
 // rotation right: 8
 // hook up: 16
 // hook down: 32
-const byte rotateLeft = 4;  // rotate left only 00000100
-const byte rotateRight = 8;  // rotate left only 0001000
 
-const byte boomUp = 1;  // rotate left only 00000001
-const byte boomDown = 2;  // rotate left only 00000010
+/*
+  The following values should be assigned according to the type of the relay module to be used (active high or active low):
 
-const byte hookUp = 16;  // rotate left only 01000000
-const byte hookDown = 32;  // rotate left only 10000000
+  - rotateLeft (4 for active high, 251 for active low)
+  - rotateLeft (8 for active high, 119 for active low)
+  - boomUp (1 for active high, 254 for active low)
+  - boomDown (2 for active high, 253 for active low)
+  - hookUp (16 for active high, 191 for active low)
+  - hookDown (32 for active high, 127 for active low)
+*/
+const byte rotateLeft = 251;  // rotate left only 00000100. Active low val: 251 
+const byte rotateRight = 119;  // rotate left only 0001000. Active low val: 119
+
+const byte boomUp = 254;  // rotate left only 00000001. Active low val: 254
+const byte boomDown = 253;  // rotate left only 00000010. Active low val: 253
+
+const byte hookUp = 191;  // rotate left only 01000000. Active low val: 191
+const byte hookDown = 223;  // rotate left only 10000000. Active low val: 127
+const byte resetAll = 255; // 11111111 
 
 unsigned long lastTimeVoltageReading, lastLEDBlinkDuration = millis();
 
@@ -107,11 +126,6 @@ byte data = 0;
 void toggleSignalLED(byte state = LOW);
 
 void setup() {
-  radio.begin();
-  radio.openReadingPipe(0, address);
-  radio.setPALevel(RF24_PA_MIN);
-  radio.startListening();
-
   // PIN CONFIG
   pinMode(LATCH_PIN, OUTPUT);
   pinMode(DATA_PIN, OUTPUT);
@@ -127,11 +141,35 @@ void setup() {
   pinMode(LED_SIGNAL, OUTPUT);
   pinMode(LED_POWER, OUTPUT); 
   ledLoop(3, 100);
+  controlDrivers(resetAll);
+  steeringStop();
+  driveStop();
   //Serial.begin(9600);
+  radio.begin();
+  radio.openReadingPipe(0, address);
+  radio.setPALevel(RF24_PA_MIN);
+  radio.startListening();
+
+  // testing
+  driveForward();
+  delay(10000);
+  driveBackward();
+  delay(10000);
+  driveStop();
+  
+  // reset all to 1
 }
 
 void loop() {
 // check whether a data is receiver
+// testing loop
+  // while(true){
+  //     driveForward();
+  //     delay(10000);
+  //     driveBackward();
+  //     delay(10000);
+  //     driveStop();
+  // }
 
   while (radio.available()) {
     resetAllValues();
@@ -194,7 +232,7 @@ void loop() {
       toggleSignalLED(HIGH);
       ledLoop(4, 100);
     }else{
-      controlDrivers(0); // turn off all
+      controlDrivers(resetAll); // turn off all
       driveStop();
       toggleSignalLED(LOW);
       resetAllValues();
@@ -217,39 +255,37 @@ void controlDrivers(byte numberToDisplay){
     digitalWrite(LATCH_PIN, HIGH);
 }
 
-void driveLeft(){
-  digitalWrite(STEERING_PIN1, HIGH);
-  digitalWrite(STEERING_PIN2, LOW);
-  digitalWrite(WHEELS_PIN1, LOW);
-  digitalWrite(WHEELS_PIN2, LOW);
-}
-
-void driveRight(){
-  digitalWrite(STEERING_PIN1, LOW);
-  digitalWrite(STEERING_PIN2, LOW);
-  digitalWrite(WHEELS_PIN1, HIGH);
-  digitalWrite(WHEELS_PIN2, LOW);
-}
-
 void driveForward(){
-  digitalWrite(STEERING_PIN1, HIGH);
-  digitalWrite(STEERING_PIN2, LOW);
-  digitalWrite(WHEELS_PIN1, HIGH);
-  digitalWrite(WHEELS_PIN2, LOW);
+  digitalWrite(WHEELS_PIN1, ACTIVE_LOW_ON);
+  digitalWrite(WHEELS_PIN2, ACTIVE_LOW_OFF);
 }
 
 void driveBackward(){
-  digitalWrite(STEERING_PIN1, LOW);
-  digitalWrite(STEERING_PIN2, HIGH);
-  digitalWrite(WHEELS_PIN1, LOW);
-  digitalWrite(WHEELS_PIN2, HIGH);
+  digitalWrite(WHEELS_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(WHEELS_PIN2, ACTIVE_LOW_ON);
 }
 
+void driveLeft(){
+  digitalWrite(STEERING_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(STEERING_PIN2, ACTIVE_LOW_ON);
+  driveForward();
+}
+
+void driveRight(){
+  digitalWrite(STEERING_PIN1, ACTIVE_LOW_ON);
+  digitalWrite(STEERING_PIN2, ACTIVE_LOW_OFF);
+  driveForward();
+}
+
+
 void driveStop(){
-  digitalWrite(STEERING_PIN1, LOW);
-  digitalWrite(STEERING_PIN2, LOW);
-  digitalWrite(WHEELS_PIN1, LOW);
-  digitalWrite(WHEELS_PIN2, LOW);
+  digitalWrite(WHEELS_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(WHEELS_PIN2, ACTIVE_LOW_OFF);
+}
+
+void steeringStop(){
+  digitalWrite(STEERING_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(STEERING_PIN2, ACTIVE_LOW_OFF);
 }
 
 void toggleSignalLED(byte state=LOW){
