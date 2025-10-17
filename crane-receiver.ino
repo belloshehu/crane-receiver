@@ -20,10 +20,10 @@ Date: 30/07/2025
 
 
 // --- DRIVER MODULE 1 (WHEEL) PINS---
-#define STEERING_PIN1 16
-#define STEERING_PIN2 17
-#define WHEELS_PIN1 14
-#define WHEELS_PIN2 15
+#define LEFT_WHEEL_PIN1 16
+#define LEFT_WHEEL_PIN2 17
+#define RIGHT_WHEEL_PIN1 14
+#define RIGHT_WHEEL_PIN2 15
 
 // --- LED PINS
 #define LED_SIGNAL 18 
@@ -132,10 +132,10 @@ void setup() {
   pinMode(CLOCK_PIN, OUTPUT);
 
   // WHEEL PINS
-  pinMode(STEERING_PIN1, OUTPUT);
-  pinMode(STEERING_PIN2, OUTPUT);
-  pinMode(WHEELS_PIN1, OUTPUT);
-  pinMode(WHEELS_PIN2, OUTPUT);
+  pinMode(LEFT_WHEEL_PIN1, OUTPUT);
+  pinMode(LEFT_WHEEL_PIN2, OUTPUT);
+  pinMode(RIGHT_WHEEL_PIN1, OUTPUT);
+  pinMode(RIGHT_WHEEL_PIN2, OUTPUT);
 
   // LED PINS
   pinMode(LED_SIGNAL, OUTPUT);
@@ -151,11 +151,11 @@ void setup() {
   radio.startListening();
 
   // testing
-  driveForward();
-  delay(10000);
-  driveBackward();
-  delay(10000);
-  driveStop();
+  // driveForward();
+  // delay(10000);
+  // driveBackward();
+  // delay(10000);
+  // driveStop();
   
   // reset all to 1
 }
@@ -172,7 +172,7 @@ void loop() {
   // }
 
   while (radio.available()) {
-    resetAllValues();
+    //resetAllValues();
     radio.read(&data, sizeof(data)); // Read the whole data and store it into the 'data' structure
     ledLoop(2,100);
 
@@ -198,7 +198,7 @@ void loop() {
       toggleSignalLED(HIGH);
       ledLoop(7, 100);
     }
-    else if (data == 3 && backDistance > OBSTACLE_MIN_DISTANCE){
+    else if (data == 3 && ( backDistance == 0 || backDistance > OBSTACLE_MIN_DISTANCE)){
       driveBackward();
       toggleSignalLED(HIGH);
       ledLoop(8, 100);
@@ -235,16 +235,16 @@ void loop() {
       controlDrivers(resetAll); // turn off all
       driveStop();
       toggleSignalLED(LOW);
-      resetAllValues();
+      //resetAllValues();
     }
   }
 
-  resetAllValues();
+  // resetAllValues();
   scanBatteryVoltage();
 }
 
 void resetAllValues(){
-  data = 0;
+  data = 255;
 }
 
 void controlDrivers(byte numberToDisplay){
@@ -256,36 +256,44 @@ void controlDrivers(byte numberToDisplay){
 }
 
 void driveForward(){
-  digitalWrite(WHEELS_PIN1, ACTIVE_LOW_ON);
-  digitalWrite(WHEELS_PIN2, ACTIVE_LOW_OFF);
+  digitalWrite(RIGHT_WHEEL_PIN1, ACTIVE_LOW_ON);
+  digitalWrite(RIGHT_WHEEL_PIN2, ACTIVE_LOW_OFF);
+  digitalWrite(LEFT_WHEEL_PIN1, ACTIVE_LOW_ON);
+  digitalWrite(LEFT_WHEEL_PIN2, ACTIVE_LOW_OFF);
 }
 
 void driveBackward(){
-  digitalWrite(WHEELS_PIN1, ACTIVE_LOW_OFF);
-  digitalWrite(WHEELS_PIN2, ACTIVE_LOW_ON);
+  digitalWrite(RIGHT_WHEEL_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(RIGHT_WHEEL_PIN2, ACTIVE_LOW_ON);
+  digitalWrite(LEFT_WHEEL_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(LEFT_WHEEL_PIN2, ACTIVE_LOW_ON);
 }
 
 void driveLeft(){
-  digitalWrite(STEERING_PIN1, ACTIVE_LOW_OFF);
-  digitalWrite(STEERING_PIN2, ACTIVE_LOW_ON);
-  driveForward();
+  digitalWrite(RIGHT_WHEEL_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(RIGHT_WHEEL_PIN2, ACTIVE_LOW_OFF);
+  digitalWrite(LEFT_WHEEL_PIN1, ACTIVE_LOW_ON);
+  digitalWrite(LEFT_WHEEL_PIN2, ACTIVE_LOW_OFF);
 }
 
 void driveRight(){
-  digitalWrite(STEERING_PIN1, ACTIVE_LOW_ON);
-  digitalWrite(STEERING_PIN2, ACTIVE_LOW_OFF);
-  driveForward();
+  digitalWrite(RIGHT_WHEEL_PIN1, ACTIVE_LOW_ON);
+  digitalWrite(RIGHT_WHEEL_PIN2, ACTIVE_LOW_OFF);
+  digitalWrite(LEFT_WHEEL_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(LEFT_WHEEL_PIN2, ACTIVE_LOW_OFF);
 }
 
 
 void driveStop(){
-  digitalWrite(WHEELS_PIN1, ACTIVE_LOW_OFF);
-  digitalWrite(WHEELS_PIN2, ACTIVE_LOW_OFF);
+  digitalWrite(RIGHT_WHEEL_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(RIGHT_WHEEL_PIN2, ACTIVE_LOW_OFF);
+  digitalWrite(LEFT_WHEEL_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(LEFT_WHEEL_PIN2, ACTIVE_LOW_OFF);
 }
 
 void steeringStop(){
-  digitalWrite(STEERING_PIN1, ACTIVE_LOW_OFF);
-  digitalWrite(STEERING_PIN2, ACTIVE_LOW_OFF);
+  digitalWrite(LEFT_WHEEL_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(LEFT_WHEEL_PIN2, ACTIVE_LOW_OFF);
 }
 
 void toggleSignalLED(byte state=LOW){
