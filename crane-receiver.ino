@@ -1,9 +1,9 @@
 
 /*
-Author: Bello  shehu
-Title: Crane remote control receiver
-Description: Receiver circuit using NRF for remote control of mini-crane. 
-Date: 30/07/2025
+  Author: Bello  shehu
+  Title: Crane remote control receiver
+  Description: Receiver circuit using NRF for remote control of mini-crane. 
+  Date: 30/07/2025
 */
 
 #include <SPI.h>
@@ -14,20 +14,31 @@ Date: 30/07/2025
 
 # define ACTIVE_LOW_ON LOW // Active low value for ON state
 # define ACTIVE_LOW_OFF HIGH // Active low value for OFF state
-
 # define ACTIVE_HIGH_ON HIGH // Active HIGH value for ON state
 # define ACTIVE_HIGH_OFF LOW // Active HIGH value for OFF state
 
 
 // --- DRIVER MODULE 1 (WHEEL) PINS---
-#define LEFT_WHEEL_PIN1 16
-#define LEFT_WHEEL_PIN2 17
+#define STEER_PIN1 16 // pin for moving the crane left and right directions
+#define STEER_PIN2 17 // pin for moving the crane left and right directions
 #define RIGHT_WHEEL_PIN1 14
 #define RIGHT_WHEEL_PIN2 15
 
+// hook pins
+#define HOOK_PIN1 7
+#define HOOK_PIN2 8
+
+// BOOM PINS
+#define BOOM_PIN1 5
+#define BOOM_PIN2 6
+
+// ROTATE PINS
+#define ROTATE_PIN1 19
+#define ROTATE_PIN2 4
+
 // --- LED PINS
 #define LED_SIGNAL 18 
-#define LED_POWER 19
+// #define LED_POWER 19
 
 // --- ULTRASONIC SENSOR (BACK) PINS ---
 #define UL_BACK_TRIG_PIN 1 // BACK TRIGGER PIN
@@ -37,23 +48,13 @@ Date: 30/07/2025
 #define UL_FR_TRIG_PIN 2 // FRONT-RIGHT TRIGGER PIN
 #define UL_FR_ECHO_PIN 3 // FRONT-RIGHT ECHO PIN
 
-// --- ULTRASONIC SENSOR (FRONT LEFT) PINS ---
-#define UL_FL_TRIG_PIN 4 // FRONT-LEFT TRIGGER PIN
-#define UL_FL_ECHO_PIN 5 // FRONT-LEFT ECHO PIN
-
 #define MAX_DISTANCE 100
-#define OBSTACLE_MIN_DISTANCE 10
+#define OBSTACLE_MIN_DISTANCE 20 // 20cm
 
 NewPing frontRightSonar(UL_FR_TRIG_PIN, UL_FR_ECHO_PIN, MAX_DISTANCE);
-NewPing frontLeftSonar(UL_FL_TRIG_PIN, UL_FL_ECHO_PIN, MAX_DISTANCE);
-NewPing backSonar(UL_BACK_TRIG_PIN, UL_BACK_ECHO_PIN, MAX_DISTANCE);
-
-
-// --- SERIAL-PARALLEL CONVERTER (74HC595) PINS ---
-
-#define DATA_PIN 6 // 7hc595 pin 14: Serial data in 
-#define CLOCK_PIN 7 // 7hc595 pin 11
-#define LATCH_PIN 8 // 7hc595 pin 12
+// NewPing frontLeftSonar(UL_FL_TRIG_PIN, UL_FL_ECHO_PIN, MAX_DISTANCE);
+NewPing backSonar(UL_BACK_TRIG_PIN, 
+UL_BACK_ECHO_PIN, MAX_DISTANCE);
 
 // --- NRF MODULE ---
 #define NRF_MISO_PIN 12
@@ -64,7 +65,7 @@ NewPing backSonar(UL_BACK_TRIG_PIN, UL_BACK_ECHO_PIN, MAX_DISTANCE);
 
 // --- LED PINS
 #define LED_SIGNAL 18
-#define LED_POWER 19
+// #define LED_POWER 19
 
 // --- VOLTAGE SEBNSOR
 #define VOLT_SENSOR_PIN A7
@@ -78,34 +79,6 @@ float ref_voltage = 5.0;
 // Integer for ADC value
 int adc_value = 0;
 
-// data for various motor states
-// boom up: 1
-// boom down: 2
-// rotation left: 4
-// rotation right: 8
-// hook up: 16
-// hook down: 32
-
-/*
-  The following values should be assigned according to the type of the relay module to be used (active high or active low):
-
-  - rotateLeft (4 for active high, 251 for active low)
-  - rotateLeft (8 for active high, 119 for active low)
-  - boomUp (1 for active high, 254 for active low)
-  - boomDown (2 for active high, 253 for active low)
-  - hookUp (16 for active high, 191 for active low)
-  - hookDown (32 for active high, 127 for active low)
-*/
-const byte rotateLeft = 251;  // rotate left only 00000100. Active low val: 251 
-const byte rotateRight = 119;  // rotate left only 0001000. Active low val: 119
-
-const byte boomUp = 254;  // rotate left only 00000001. Active low val: 254
-const byte boomDown = 253;  // rotate left only 00000010. Active low val: 253
-
-const byte hookUp = 191;  // rotate left only 01000000. Active low val: 191
-const byte hookDown = 223;  // rotate left only 10000000. Active low val: 127
-const byte resetAll = 255; // 11111111 
-
 unsigned long lastTimeVoltageReading, lastLEDBlinkDuration = millis();
 
 byte ledState, blinkState = LOW;
@@ -114,34 +87,30 @@ byte blinkIndex = 0;
 RF24 radio(NRF_CE_PIN, NRF_CSN_PIN);
 const byte address[6] = "00011";
 
-// struct Data_package {
-//   char boom = 'u'; // boom can take the following: up, down, left (to ratete left), right (to ratate right)
-//   char hook = 'd'; // hook take the following: up, down
-//   char drive = 'f'; // drive take the following: forward, left, right, backward
-// };
 byte data = 0;
-
-// Data_package data; // Create a variable with the above structure
 
 void toggleSignalLED(byte state = LOW);
 
 void setup() {
-  // PIN CONFIG
-  pinMode(LATCH_PIN, OUTPUT);
-  pinMode(DATA_PIN, OUTPUT);
-  pinMode(CLOCK_PIN, OUTPUT);
 
   // WHEEL PINS
-  pinMode(LEFT_WHEEL_PIN1, OUTPUT);
-  pinMode(LEFT_WHEEL_PIN2, OUTPUT);
+  pinMode(STEER_PIN1, OUTPUT);
+  pinMode(STEER_PIN2, OUTPUT);
   pinMode(RIGHT_WHEEL_PIN1, OUTPUT);
   pinMode(RIGHT_WHEEL_PIN2, OUTPUT);
 
+  pinMode(BOOM_PIN1, OUTPUT);
+  pinMode(BOOM_PIN2, OUTPUT);
+  pinMode(HOOK_PIN1, OUTPUT);
+  pinMode(HOOK_PIN2, OUTPUT);
+  pinMode(ROTATE_PIN1, OUTPUT);
+  pinMode(ROTATE_PIN2, OUTPUT);
+
   // LED PINS
   pinMode(LED_SIGNAL, OUTPUT);
-  pinMode(LED_POWER, OUTPUT); 
+  // pinMode(LED_POWER, OUTPUT); 
   ledLoop(3, 100);
-  controlDrivers(resetAll);
+  // controlDrivers(resetAll);
   steeringStop();
   driveStop();
   //Serial.begin(9600);
@@ -150,50 +119,34 @@ void setup() {
   radio.setPALevel(RF24_PA_MIN);
   radio.startListening();
 
-  // testing
-  // driveForward();
-  // delay(10000);
-  // driveBackward();
-  // delay(10000);
-  // driveStop();
-  
-  // reset all to 1
 }
 
 void loop() {
-// check whether a data is receiver
-// testing loop
-  // while(true){
-  //     driveForward();
-  //     delay(10000);
-  //     driveBackward();
-  //     delay(10000);
-  //     driveStop();
-  // }
-
   while (radio.available()) {
     //resetAllValues();
     radio.read(&data, sizeof(data)); // Read the whole data and store it into the 'data' structure
     ledLoop(2,100);
 
     // // check for hook control data
-    int frontLeftDistance = frontLeftSonar.ping_cm();
+    // int frontLeftDistance = frontLeftSonar.ping_cm();
     int frontRightDistance = frontRightSonar.ping_cm();
     int backDistance = backSonar.ping_cm();
 
     if(data == 7){
-      controlDrivers(hookUp);
+      // controlDrivers(hookUp);
+      hookUp();
       toggleSignalLED(HIGH);
       ledLoop(5, 100);
     }
     else if(data == 8){
-      controlDrivers(hookDown);
+      // controlDrivers(hookDown);
+      hookDown();
       toggleSignalLED(HIGH);
       ledLoop(6, 100); 
     }
 
     // check if it is drive control data
-    else if (data == 1 && (frontRightDistance > OBSTACLE_MIN_DISTANCE || frontRightDistance == 0 )  && (frontLeftDistance > OBSTACLE_MIN_DISTANCE|| frontLeftDistance == 0)){
+    else if (data == 1 && (frontRightDistance > OBSTACLE_MIN_DISTANCE || frontRightDistance == 0 )){
       driveForward();
       toggleSignalLED(HIGH);
       ledLoop(7, 100);
@@ -203,36 +156,43 @@ void loop() {
       toggleSignalLED(HIGH);
       ledLoop(8, 100);
     }
-    else if (data == 4 && (frontRightDistance > OBSTACLE_MIN_DISTANCE || frontRightDistance == 0 )  && (frontLeftDistance > OBSTACLE_MIN_DISTANCE|| frontLeftDistance == 0)){
-      driveLeft();
+    else if (data == 4 && (frontRightDistance > OBSTACLE_MIN_DISTANCE || frontRightDistance == 0 )){
+      steerLeft();
       toggleSignalLED(HIGH);
       ledLoop(9, 100);
     }
-    else if (data == 2 && (frontRightDistance > OBSTACLE_MIN_DISTANCE || frontRightDistance == 0 )  && (frontLeftDistance > OBSTACLE_MIN_DISTANCE|| frontLeftDistance == 0)){
-      driveRight();
+    else if (data == 2 && (frontRightDistance > OBSTACLE_MIN_DISTANCE || frontRightDistance == 0)){
+      steerRight();
       toggleSignalLED(HIGH);
       ledLoop(10, 100);
     }
     else if(data == 9){
-      controlDrivers(boomUp);
+      // controlDrivers(boomUp);
+      boomUp();
       ledLoop(1, 100);
     }
     else if(data == 10){
-      controlDrivers(boomDown);
+      // controlDrivers(boomDown);
+      boomDown();
       toggleSignalLED(HIGH);
       ledLoop(2, 100);
     }
     else if(data == 11){
-      controlDrivers(rotateLeft);
+      // controlDrivers(rotateLeft);
+      rotateLeft();
       toggleSignalLED(HIGH);
       ledLoop(3, 100);
     }
     else if(data == 12){
-      controlDrivers(rotateRight);
+      // controlDrivers(rotateRight);
+      rotateRight();
       toggleSignalLED(HIGH);
       ledLoop(4, 100);
     }else{
-      controlDrivers(resetAll); // turn off all
+      // controlDrivers(resetAll); // turn off all
+      rotateOff();
+      boomOff();
+      hookOff();
       driveStop();
       toggleSignalLED(LOW);
       //resetAllValues();
@@ -247,68 +207,98 @@ void resetAllValues(){
   data = 255;
 }
 
-void controlDrivers(byte numberToDisplay){
-    digitalWrite(LATCH_PIN, LOW);
-    // Shift out the bits
-    shiftOut(DATA_PIN, CLOCK_PIN, MSBFIRST, numberToDisplay);
-    // ST_CP HIGH change LEDs
-    digitalWrite(LATCH_PIN, HIGH);
+// functions to control hook
+void hookUp(){
+  digitalWrite(HOOK_PIN1, ACTIVE_LOW_ON);
+  digitalWrite(HOOK_PIN2, ACTIVE_LOW_OFF);
 }
+
+void hookDown(){
+  digitalWrite(HOOK_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(HOOK_PIN2, ACTIVE_LOW_ON);
+}
+
+void hookOff(){
+  digitalWrite(HOOK_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(HOOK_PIN2, ACTIVE_LOW_OFF);
+}
+
+// functions to control boom
+void boomUp(){
+  digitalWrite(BOOM_PIN1, ACTIVE_LOW_ON);
+  digitalWrite(BOOM_PIN2, ACTIVE_LOW_OFF);
+}
+
+void boomDown(){
+  digitalWrite(BOOM_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(BOOM_PIN2, ACTIVE_LOW_ON);
+}
+
+void boomOff(){
+  digitalWrite(BOOM_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(BOOM_PIN2, ACTIVE_LOW_OFF);
+}
+
+
+// functions to control rotation:
+void rotateLeft(){
+  digitalWrite(ROTATE_PIN1, ACTIVE_LOW_ON);
+  digitalWrite(ROTATE_PIN2, ACTIVE_LOW_OFF);
+}
+
+void rotateRight(){
+  digitalWrite(ROTATE_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(ROTATE_PIN2, ACTIVE_LOW_ON);
+}
+
+void rotateOff(){
+  digitalWrite(ROTATE_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(ROTATE_PIN2, ACTIVE_LOW_OFF);
+}
+
+
 
 void driveForward(){
   digitalWrite(RIGHT_WHEEL_PIN1, ACTIVE_LOW_ON);
   digitalWrite(RIGHT_WHEEL_PIN2, ACTIVE_LOW_OFF);
-  digitalWrite(LEFT_WHEEL_PIN1, ACTIVE_LOW_ON);
-  digitalWrite(LEFT_WHEEL_PIN2, ACTIVE_LOW_OFF);
 }
 
 void driveBackward(){
   digitalWrite(RIGHT_WHEEL_PIN1, ACTIVE_LOW_OFF);
   digitalWrite(RIGHT_WHEEL_PIN2, ACTIVE_LOW_ON);
-  digitalWrite(LEFT_WHEEL_PIN1, ACTIVE_LOW_OFF);
-  digitalWrite(LEFT_WHEEL_PIN2, ACTIVE_LOW_ON);
 }
 
-void driveLeft(){
-  digitalWrite(RIGHT_WHEEL_PIN1, ACTIVE_LOW_OFF);
-  digitalWrite(RIGHT_WHEEL_PIN2, ACTIVE_LOW_OFF);
-  digitalWrite(LEFT_WHEEL_PIN1, ACTIVE_LOW_ON);
-  digitalWrite(LEFT_WHEEL_PIN2, ACTIVE_LOW_OFF);
+void steerLeft(){
+  digitalWrite(STEER_PIN1, ACTIVE_LOW_ON);
+  digitalWrite(STEER_PIN2, ACTIVE_LOW_OFF);
 }
 
-void driveRight(){
-  digitalWrite(RIGHT_WHEEL_PIN1, ACTIVE_LOW_ON);
-  digitalWrite(RIGHT_WHEEL_PIN2, ACTIVE_LOW_OFF);
-  digitalWrite(LEFT_WHEEL_PIN1, ACTIVE_LOW_OFF);
-  digitalWrite(LEFT_WHEEL_PIN2, ACTIVE_LOW_OFF);
+void steerRight(){
+  digitalWrite(STEER_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(STEER_PIN2, ACTIVE_LOW_ON);
 }
 
 
 void driveStop(){
   digitalWrite(RIGHT_WHEEL_PIN1, ACTIVE_LOW_OFF);
   digitalWrite(RIGHT_WHEEL_PIN2, ACTIVE_LOW_OFF);
-  digitalWrite(LEFT_WHEEL_PIN1, ACTIVE_LOW_OFF);
-  digitalWrite(LEFT_WHEEL_PIN2, ACTIVE_LOW_OFF);
+  digitalWrite(STEER_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(STEER_PIN2, ACTIVE_LOW_OFF);
 }
 
 void steeringStop(){
-  digitalWrite(LEFT_WHEEL_PIN1, ACTIVE_LOW_OFF);
-  digitalWrite(LEFT_WHEEL_PIN2, ACTIVE_LOW_OFF);
+  digitalWrite(STEER_PIN1, ACTIVE_LOW_OFF);
+  digitalWrite(STEER_PIN2, ACTIVE_LOW_OFF);
 }
 
 void toggleSignalLED(byte state=LOW){
   digitalWrite(LED_SIGNAL, state);
 }
 
-void togglePowerLED( byte state=LOW){
-  digitalWrite(LED_POWER, state);
-}
-
 float getVoltage(){
   float adc_value = analogRead(VOLT_SENSOR_PIN);
   // Determine voltage at ADC input
   adc_voltage  = (adc_value * ref_voltage) / 1024.0;
-
   // Calculate voltage at divider input
   float voltage = adc_voltage*(R1+R2)/R2;
   return voltage;
@@ -337,14 +327,14 @@ void scanBatteryVoltage(){
     if(volt < 11.3){
       // turn blink RED LED when less 10v
       if(ledState){
-        togglePowerLED(LOW);
+       // togglePowerLED(LOW);
       }else{
-        togglePowerLED(HIGH);
+       // togglePowerLED(HIGH);
       }
       ledState = !ledState;
     }else {
       // turn LED 
-      togglePowerLED(HIGH);
+      // togglePowerLED(HIGH);
     }
     lastTimeVoltageReading = millis();
   }
